@@ -1,0 +1,53 @@
+name: Build application and publish a Docker image 
+
+on:
+  push:
+    branches: [ "master" ]
+    
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Bump version in package.json
+        id: version-bump
+        uses: 'phips28/gh-action-bump-version@master'
+        with:
+          tag-prefix: ''
+          skip-tag: 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_ACCESS_REPO }}
+               
+      - name: Log in to the Container registry
+        uses: docker/login-action@v1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.PAT_ACCESS_GHCR }}
+          
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}    
+    
+      - name: Convert string to lowercase (as ghcr does not accept Gard-AS)
+        id: lowercase
+        uses: ASzc/change-string-case-action@v5
+        with:
+          string: ${{ env.IMAGE_NAME }}
+    
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ steps.lowercase.outputs.lowercase }}:${{ steps.version-bump.outputs.newTag }}
+          labels: ${{ steps.meta.outputs.labels }}
