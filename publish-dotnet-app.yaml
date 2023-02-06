@@ -1,0 +1,55 @@
+name: Build application and publish a Docker image 
+
+on:
+  push:
+    branches: [ "main" ]
+    
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Bump version in VERSION
+        run: echo "$(cat VERSION | awk -F. '/[0-9]+\./{$NF++;print}' OFS=. )" > VERSION
+      
+      - name: Commit & Push changes
+        uses: actions-js/push@master
+        with:
+          github_token: ${{ secrets.PAT_ACCESS_REPO }}
+        
+      - name: Read new version and write into env
+        run: echo "NEW_VERSION=$(cat VERSION)" >> $GITHUB_ENV
+         
+      - name: Log in to the Container registry
+        uses: docker/login-action@v1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.PAT_ACCESS_GHCR }}
+          
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}    
+    
+      - name: Convert string to lowercase (as ghcr does not accept Gard-AS)
+        id: lowercase
+        uses: ASzc/change-string-case-action@v5
+        with:
+          string: ${{ env.IMAGE_NAME }}
+    
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ steps.lowercase.outputs.lowercase }}:${{ env.NEW_VERSION }}
+          labels: ${{ steps.meta.outputs.labels }}
