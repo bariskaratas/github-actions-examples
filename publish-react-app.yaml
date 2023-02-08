@@ -38,7 +38,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}    
     
-      - name: Convert string to lowercase (as ghcr does not accept Gard-AS)
+      - name: Convert string to lowercase (as ghcr does not accept uppercase when in company name)
         id: lowercase
         uses: ASzc/change-string-case-action@v5
         with:
